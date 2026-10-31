@@ -52,10 +52,13 @@
   body:not([data-modo="total"]) .solototal { display:none; }
   body:not([data-modo="tq"]):not([data-modo="total"]) .solotqdur { display:none; }
   .cfg input[type=checkbox] { width:1.7em; height:1.7em; justify-self:end; }
+  #flash { position:fixed; inset:0; background:#2fd36b; opacity:0; pointer-events:none; z-index:50; transition:opacity .3s ease-out; }
+  #flash.on { opacity:.5; transition:none; }
   .linkbtn { font:inherit; background:none; border:0; color:var(--hit); cursor:pointer; text-decoration:underline; padding:0; }
 </style>
 </head>
 <body data-modo="normal">
+  <div id="flash"></div>
   <div class="modos">
     <button id="mNormal" aria-pressed="true">Timer</button>
     <button id="mTq" aria-pressed="false">Entrenamiento + TQ</button>
@@ -96,6 +99,9 @@
         <label for="tMax">Tiempo máximo del ejercicio (s)</label><input type="number" id="tMax" value="30" min="2" max="120" step="1">
         <span class="solotqdur">Cuenta atrás del torniquete (s)</span>
         <span class="solotqdur opciones" id="tqDur"><button data-s="20" aria-pressed="false">20</button><button data-s="30" aria-pressed="true">30</button><button data-s="40" aria-pressed="false">40</button></span>
+        <label class="solotqdur" for="tqVoz">Parar el torniquete con la voz (¡Ya! / ¡Stop!) al colocarlo</label><input class="solotqdur" type="checkbox" id="tqVoz" checked>
+        <label class="solotqdur" for="sensTQ">Sensibilidad para parar el torniquete (bájala si las sirenas lo paran solas)</label>
+        <input class="solotqdur" type="range" id="sensTQ" min="5" max="95" value="40">
         <label class="solotq" for="hMin">"Herido" suena como pronto (s tras el pitido)</label><input class="solotq" type="number" id="hMin" value="3" min="1" max="60" step="0.5">
         <label class="solotq" for="hMax">"Herido" suena como tarde (s tras el pitido)</label><input class="solotq" type="number" id="hMax" value="10" min="1" max="90" step="0.5">
         <label class="soloint" for="iMin">"Interrupción" suena como pronto (s tras el pitido)</label><input class="soloint" type="number" id="iMin" value="3" min="1" max="60" step="0.5">
@@ -242,6 +248,13 @@
       $('diag').textContent = 'Audio: ' + ctx.state + ' · pista: ' + (pista ? pista.readyState + (pista.muted ? ' (silenciada)' : '') : '—') + ' · nivel: ' + pico.toFixed(3) + ' · umbral: ' + umbral().toFixed(3);
     }
     if (fase === 'idle' && pico > umbral() && ahora - ultimoFlash > 250) { ultimoFlash = ahora; flash(); }
+    if (fase === 'tqCuenta' && tqInicio) {
+      tqBase = tqBase * 0.97 + pico * 0.03; // nivel medio de los sonidos del propio ejercicio
+      var umbTQ = 0.5 * Math.pow(0.02, num('sensTQ') / 100);
+      if ($('tqVoz').checked && ahora > tqIgnora && pico > Math.max(umbTQ, tqBase * 3)) {
+        if (++tqSeguidos >= 2) pararTQ();
+      } else { tqSeguidos = 0; }
+    }
     if (fase === 'totCorriendo') {
       crono.textContent = fmt(ahora - tS);
       if ((ahora > ignoraHasta && ahora - ultimo > 150 && pico > umbral()) || ahora - tS > 60000) cerrarEtapa(ahora);
@@ -278,15 +291,15 @@
   }
 
   // ---------- Ejercicio ----------
-  function limpiar() { pararSirena(); timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = []; }
+  function limpiar() { tqInicio = 0; pararSirena(); timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = []; }
   function setFase(f) {
     fase = f;
     boton.className = f === 'idle' ? '' : 'activo';
-    boton.textContent = f === 'idle' ? 'Inicio' : ((f === 'corriendo' || f === 'intCorriendo' || f === 'ccCorriendo' || f === 'totCorriendo') ? 'Parar' : 'Cancelar');
+    boton.textContent = f === 'idle' ? 'Inicio' : ((f === 'corriendo' || f === 'intCorriendo' || f === 'ccCorriendo' || f === 'totCorriendo' || f === 'tqCuenta') ? 'Parar' : 'Cancelar');
     $('mNormal').disabled = $('mTq').disabled = $('mInt').disabled = $('mCc').disabled = $('mTot').disabled = f !== 'idle';
   }
   function disparo(ahora) {
-    ultimo = ahora; shots.push(ahora - t0);
+    ultimo = ahora; shots.push(ahora - t0); destello();
     var n = shots.length, tt = shots[n - 1];
     estado.textContent = 'Disparo ' + n + ': ' + fmt(tt) + (n > 1 ? '  (+' + fmt(tt - shots[n - 2]) + ')' : '');
     mostrar(); // la tabla se actualiza con cada disparo
@@ -328,6 +341,7 @@
     timers.push(setTimeout(function () { if (mia === token) herido(mia); }, (a + Math.random() * (b - a)) * 1000));
   }
   function herido(mia) {
+    tqInicio = 0;
     if (fase === 'corriendo') terminar(); // cierra el registro de disparos
     setFase('tqCuenta'); document.body.className = 'herido';
     estado.textContent = '¡HERIDO! Torniquete';
@@ -335,6 +349,7 @@
     // La cuenta atrás arranca en el instante exacto en que empieza a sonar la voz
     decir('¡Herido! ¡Herido!', true, function () {
       if (mia !== token) return;
+      tqInicio = performance.now(); tqIgnora = tqInicio + 2500; tqBase = 0; tqSeguidos = 0;
       var fin = performance.now() + tqDur * 1000;
       var iv = setInterval(function () {
         if (mia !== token) { clearInterval(iv); return; }
@@ -447,6 +462,7 @@
     s.buffer = b; g.gain.value = vol; s.connect(g); g.connect(ctx.destination); s.start();
   }
   function finTQ(mia) {
+    tqInicio = 0;
     crono.textContent = '0'; estado.textContent = '¡TIEMPO!';
     for (var i = 0; i < 6; i++) (function (i) {
       timers.push(setTimeout(function () { if (mia === token) pitido(2800, 0.3); }, i * 450));
@@ -479,6 +495,30 @@
       if (intentos < 3) setTimeout(function () { if (!empezo) decirYa(); }, 700);
     }
     decirYa();
+  }
+  // Destello verde semitransparente en cada disparo: el interfaz sigue visible debajo
+  function destello() {
+    var f = $('flash');
+    f.classList.add('on');
+    setTimeout(function () { f.classList.remove('on'); }, 110);
+  }
+  var tqInicio = 0, tqIgnora = 0, tqBase = 0, tqSeguidos = 0;
+  // El usuario marca "torniquete colocado" gritando ¡Ya! / ¡Stop!, tocando el cronómetro o pulsando Parar
+  function pararTQ() {
+    if (fase !== 'tqCuenta' || !tqInicio) return;
+    var t = performance.now() - tqInicio;
+    tqInicio = 0;
+    token++; limpiar();
+    try { speechSynthesis.cancel(); } catch (e) {}
+    destello();
+    crono.textContent = fmt(t);
+    if (modo === 'total') {
+      totEtapas.push({ n: 'Torniquete', t: fmt(t) + ' s (colocado)' }); renderTot();
+      etapaTerminada(token);
+    } else {
+      setFase('idle'); document.body.className = '';
+      estado.textContent = 'Torniquete colocado: ' + fmt(t) + ' s';
+    }
   }
   // ---------- Entrenamiento total (ejercicios aleatorios encadenados) ----------
   var totEtapas = [], totKind = '', tS = 0;
@@ -534,6 +574,7 @@
   }
   function cerrarEtapa(ahora) {
     if (fase !== 'totCorriendo') return;
+    destello();
     var t = ahora - tS; ultimo = ahora;
     totEtapas.push({ n: NOMBRES[totKind], t: fmt(t) + ' s' });
     crono.textContent = fmt(t);
@@ -587,6 +628,7 @@
   }
   function terminarCC() {
     if (fase !== 'ccCorriendo') return;
+    destello();
     ccTiempo = performance.now() - tC;
     setFase('idle'); document.body.className = '';
     crono.textContent = fmt(ccTiempo);
@@ -623,6 +665,7 @@
   }
   function terminarInterrupcion() {
     if (fase !== 'intCorriendo') return;
+    destello();
     interrTiempo = performance.now() - tI;
     setFase('idle'); document.body.className = '';
     crono.textContent = fmt(interrTiempo);
@@ -694,6 +737,7 @@
     if (fase === 'intCorriendo') { terminarInterrupcion(); return; }
     if (fase === 'ccCorriendo') { terminarCC(); return; }
     if (fase === 'totCorriendo') { cerrarEtapa(performance.now()); return; }
+    if (fase === 'tqCuenta' && tqInicio) { pararTQ(); return; }
     if (fase !== 'idle') { token++; limpiar(); try { speechSynthesis.cancel(); } catch (e) {} setFase('idle'); document.body.className = ''; estado.textContent = 'Cancelado'; crono.textContent = '0.00'; return; }
     desbloquearVoz();
     try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(function () {}); } catch (e) {}
@@ -708,6 +752,7 @@
     else if (fase === 'intCorriendo') terminarInterrupcion();
     else if (fase === 'ccCorriendo') terminarCC();
     else if (fase === 'totCorriendo') cerrarEtapa(performance.now());
+    else if (fase === 'tqCuenta') pararTQ();
   });
   $('probarMic').addEventListener('click', function () { initAudio(); ctx.resume(); iniciarMic(); });
   document.addEventListener('keydown', function (e) {
