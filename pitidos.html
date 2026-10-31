@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timer de tiro en seco</title>
+<style>
+  :root { --paper:#f4f1ea; --ink:#16181c; --hit:#c8281e; --ok:#1f7a45; --mute:#6b6f76; --line:#d6d1c4; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink);
+    font-family:"Bahnschrift","Segoe UI","Helvetica Neue",Arial,sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:2vh; padding:2vh 3vw 4vh;
+    transition:background .15s; }
+  body.ready { background:#f3e6a6; }
+  body.go { background:#bfe2c4; }
+  #estado { font-size:clamp(1.6rem,6vw,3rem); font-weight:700; text-align:center; min-height:1.2em; }
+  #crono { font-size:clamp(5rem,26vw,15rem); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+  #inicio { font:inherit; font-size:clamp(2rem,8vw,4.5rem); font-weight:700; width:min(94vw,760px);
+    padding:.45em 1em; border:0; border-radius:.3em; background:var(--ink); color:var(--paper); cursor:pointer; }
+  #inicio.activo { background:var(--hit); }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline:3px solid var(--hit); outline-offset:3px; }
+  .panel { width:min(94vw,760px); }
+  .medidor { height:14px; background:#fff; border:1px solid var(--line); position:relative; border-radius:7px; overflow:hidden; }
+  .medidor i { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--mute); }
+  .medidor b { position:absolute; top:0; bottom:0; width:3px; background:var(--hit); }
+  .etq { font-size:.95rem; color:var(--mute); margin:.3em 0 0; }
+  details { background:#fff; border:1px solid var(--line); border-radius:.4em; padding:.6em 1em; }
+  summary { cursor:pointer; font-weight:700; }
+  .cfg { display:grid; grid-template-columns:1fr auto; gap:.6em 1em; align-items:center; margin-top:.8em; }
+  .cfg input[type=number] { width:5.5em; font:inherit; padding:.3em; text-align:right; }
+  .cfg input[type=range] { width:100%; grid-column:1 / -1; }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:1.15rem; }
+  td, th { padding:.35em .5em; border-bottom:1px solid var(--line); text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--mute); font-weight:600; font-size:.9rem; }
+  .bueno { color:var(--ok); font-weight:700; }
+  .malo { color:var(--hit); font-weight:700; }
+  .resumen { display:flex; gap:1.2em; flex-wrap:wrap; font-size:1.1rem; margin:.4em 0 .8em; }
+  .resumen span b { font-size:1.35em; }
+  .modos { display:flex; gap:.5em; width:min(94vw,760px); }
+  .modos button, .opciones button { flex:1; font:inherit; font-weight:700; border:2px solid var(--ink); background:transparent;
+    color:var(--ink); border-radius:.3em; cursor:pointer; padding:.6em .4em; font-size:clamp(1rem,3.8vw,1.35rem); }
+  .opciones { display:flex; gap:.4em; }
+  .opciones button { padding:.35em .8em; font-size:1.05rem; }
+  .modos button[aria-pressed="true"], .opciones button[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
+  .modos button:disabled { opacity:.45; cursor:default; }
+  body.herido { background:#efaaa1; }
+  body:not([data-modo="tq"]) .solotq { display:none; }
+  .linkbtn { font:inherit; background:none; border:0; color:var(--hit); cursor:pointer; text-decoration:underline; padding:0; }
+</style>
+</head>
+<body data-modo="normal">
+  <div class="modos">
+    <button id="mNormal" aria-pressed="true">Timer</button>
+    <button id="mTq" aria-pressed="false">Entrenamiento + TQ</button>
+  </div>
+  <div id="estado">Pulsa Inicio</div>
+  <div id="crono" aria-live="off">0.00</div>
+  <button id="inicio">Inicio</button>
+
+  <div class="panel">
+    <div class="medidor" aria-label="Nivel del micrófono"><i id="nivel"></i><b id="umbral"></b></div>
+    <p class="etq" id="micEstado">Micrófono apagado. Se activa al pulsar Inicio o aquí:</p>
+    <button class="linkbtn" id="probarMic">Probar micrófono</button>
+    <p class="etq" id="diag"></p>
+  </div>
+
+  <div class="panel" id="resultado" hidden>
+    <div class="resumen" id="resumen"></div>
+    <table><thead><tr><th>Disparo</th><th>Tiempo</th><th>Split</th></tr></thead><tbody id="tabla"></tbody></table>
+  </div>
+
+  <div class="panel">
+    <details>
+      <summary>Ajustes</summary>
+      <div class="cfg">
+        <label for="sens">Sensibilidad del micrófono (sube si no detecta el clic)</label><span id="sensV"></span>
+        <input type="range" id="sens" min="1" max="99" value="70">
+        <label for="dMin">Espera mínima tras "Preparado" (s)</label><input type="number" id="dMin" value="1" min="0.5" max="30" step="0.5">
+        <label for="dMax">Espera máxima tras "Preparado" (s)</label><input type="number" id="dMax" value="6" min="1" max="60" step="0.5">
+        <label for="par">Tiempo par (s, 0 = sin par)</label><input type="number" id="par" value="0" min="0" max="60" step="0.1">
+        <label for="nDisp">Disparos por ejercicio (el timer para al llegar)</label><input type="number" id="nDisp" value="1" min="1" max="30" step="1">
+        <label for="tMax">Tiempo máximo del ejercicio (s)</label><input type="number" id="tMax" value="15" min="2" max="120" step="1">
+        <span class="solotq">Cuenta atrás del torniquete (s)</span>
+        <span class="solotq opciones" id="tqDur"><button data-s="20" aria-pressed="false">20</button><button data-s="30" aria-pressed="true">30</button><button data-s="40" aria-pressed="false">40</button></span>
+        <label class="solotq" for="hMin">"Herido" suena como pronto (s tras el pitido)</label><input class="solotq" type="number" id="hMin" value="3" min="1" max="60" step="0.5">
+        <label class="solotq" for="hMax">"Herido" suena como tarde (s tras el pitido)</label><input class="solotq" type="number" id="hMax" value="10" min="1" max="90" step="0.5">
+      </div>
+      <p class="etq">Tip: en tiro en seco, el clic del disparador es bajo. Pulsa "Probar micrófono" y haz tu clic: la barra debe pasar la línea roja y avisar "Sonido detectado". Si no, sube la sensibilidad; si salta con el ruido ambiente, bájala.</p>
+    </details>
+  </div>
+
+  <div class="panel" id="histPanel" hidden>
+    <details>
+      <summary>Últimos ejercicios</summary>
+      <table><thead><tr><th>Hora</th><th>1.º disparo</th><th>Total</th><th>Disp.</th></tr></thead><tbody id="hist"></tbody></table>
+      <p class="etq"><button class="linkbtn" id="borrar">Borrar historial</button></p>
+    </details>
+  </div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var boton = $('inicio'), estado = $('estado'), crono = $('crono');
+  var ctx = null, analyser = null, buf = null, micOK = false, lockMic = false;
+  var modo = 'normal', tqDur = 30;
+  var fase = 'idle'; // idle | cuenta | espera | corriendo
+  var token = 0, timers = [], t0 = 0, ultimo = 0, shots = [], parSonado = false, vozES = null;
+  var pista = null, ultimoDiag = 0, ultimoFlash = 0, VENTANA = 450; // ms ignorados tras el pitido para no detectar el propio pitido
+
+  function num(id) { return parseFloat($(id).value) || 0; }
+  function umbral() { return 0.5 * Math.pow(0.01 / 0.5, $('sens').value / 100); }
+  function pintaUmbral() { $('umbral').style.left = Math.min(Math.sqrt(umbral()) * 100, 99) + '%'; $('sensV').textContent = $('sens').value; }
+  $('sens').addEventListener('input', pintaUmbral); pintaUmbral();
+
+  function fmt(ms) {
+    var t = Math.floor(ms / 10), cs = t % 100, sg = Math.floor(t / 100) % 60, mn = Math.floor(t / 6000);
+    var r = (mn ? (sg < 10 ? '0' : '') : '') + sg + '.' + (cs < 10 ? '0' : '') + cs;
+    return mn ? mn + ':' + r : r;
+  }
+
+  // ---------- Audio ----------
+  function pitido(freq, dur) {
+    if (ctx.state !== 'running') ctx.resume();
+    var o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.type = 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(1.0, t + 0.01);
+    g.gain.setValueAtTime(1.0, t + Math.max(dur - 0.03, 0.02));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function tono(freq, dur, vol, tipo, hasta) {
+    if (ctx.state !== 'running') ctx.resume();
+    var o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.type = tipo || 'sine'; o.frequency.setValueAtTime(freq, t);
+    if (hasta) o.frequency.exponentialRampToValueAtTime(hasta, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  // Mantiene el audio despierto (el móvil lo suspende tras usar voz o micrófono)
+  function initAudio() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.onstatechange = function () { if (ctx.state !== 'running') ctx.resume(); };
+    var k = ctx.createOscillator(), kg = ctx.createGain();
+    kg.gain.value = 0.0001; k.frequency.value = 20;
+    k.connect(kg); kg.connect(ctx.destination); k.start();
+  }
+  function elegirVoz() {
+    var vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    vozES = vs.filter(function (v) { return /^es/i.test(v.lang); })[0] || null;
+  }
+  if (window.speechSynthesis) { elegirVoz(); speechSynthesis.onvoiceschanged = elegirVoz; }
+  function desbloquearVoz() {
+    if (!window.speechSynthesis) return;
+    var u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u);
+  }
+  function decir(txt, fuerte, alEmpezar) {
+    var ok = false, hecho = false;
+    function cb() { if (!hecho && alEmpezar) { hecho = true; alEmpezar(); } }
+    try {
+      if (speechSynthesis.paused) speechSynthesis.resume();
+      var u = new SpeechSynthesisUtterance(txt);
+      u.lang = 'es-ES'; u.volume = 1; u.rate = fuerte ? 1.05 : 0.9; if (vozES) u.voice = vozES;
+      u.onstart = function () { ok = true; cb(); };
+      speechSynthesis.speak(u);
+    } catch (e) {}
+    setTimeout(function () { if (!ok) { pitido(600, 0.4); cb(); } }, 700);
+  }
+
+  // ---------- Micrófono y detección ----------
+  async function iniciarMic() {
+    if (micOK || lockMic) return;
+    lockMic = true;
+    var msg = $('micEstado');
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw { name: 'SinAPI' };
+      }
+      var stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      ctx.resume();
+      var src = ctx.createMediaStreamSource(stream);
+      analyser = ctx.createAnalyser(); analyser.fftSize = 2048; // ~40 ms: no se escapa ningún clic entre frames
+      analyser.smoothingTimeConstant = 0;
+      var mudo = ctx.createGain(); mudo.gain.value = 0;
+      src.connect(analyser); analyser.connect(mudo); mudo.connect(ctx.destination);
+      buf = new Uint8Array(analyser.fftSize);
+      micOK = true;
+      pista = stream.getAudioTracks()[0];
+      msg.textContent = 'Micrófono activo. Haz un clic o una palmada: la barra debe subir y pasar la línea roja.';
+      bucle();
+    } catch (e) {
+      var n = e && e.name;
+      msg.textContent = n === 'NotAllowedError' ? 'Micrófono bloqueado: permite el acceso en el candado de la barra de direcciones y recarga.'
+        : n === 'NotFoundError' ? 'No se encuentra ningún micrófono.'
+        : n === 'SinAPI' ? 'Este navegador no permite micrófono aquí. Abre el archivo directamente en Chrome o Safari (no en una vista previa).'
+        : 'No se pudo activar el micrófono (' + (n || 'error') + '). Usa "Parar" o la barra espaciadora.';
+    }
+    lockMic = false;
+  }
+  function bucle() {
+    if (!micOK) return;
+    analyser.getByteTimeDomainData(buf);
+    var pico = 0;
+    for (var i = 0; i < buf.length; i++) { var d = Math.abs(buf[i] - 128) / 128; if (d > pico) pico = d; }
+    $('nivel').style.width = Math.min(Math.sqrt(pico) * 100, 100) + '%';
+    var ahora = performance.now();
+    if (ahora - ultimoDiag > 400) {
+      ultimoDiag = ahora;
+      if (ctx.state !== 'running') ctx.resume();
+      $('diag').textContent = 'Audio: ' + ctx.state + ' · pista: ' + (pista ? pista.readyState + (pista.muted ? ' (silenciada)' : '') : '—') + ' · nivel: ' + pico.toFixed(3) + ' · umbral: ' + umbral().toFixed(3);
+    }
+    if (fase === 'idle' && pico > umbral() && ahora - ultimoFlash > 250) { ultimoFlash = ahora; flash(); }
+    if (fase === 'corriendo') {
+      crono.textContent = fmt(ahora - t0);
+      if (par() && !parSonado && ahora - t0 >= par() * 1000) { parSonado = true; pitido(1000, 0.25); }
+      if (ahora - t0 > num('tMax') * 1000) { terminar(); }
+      else if (ahora - t0 > VENTANA && ahora - ultimo > 150 && pico > umbral()) { disparo(ahora); }
+    }
+    requestAnimationFrame(bucle);
+  }
+  function par() { return num('par'); }
+  function flash() {
+    var m = $('nivel'); m.style.background = 'var(--hit)';
+    $('micEstado').textContent = '¡Sonido detectado!';
+    setTimeout(function () { m.style.background = ''; }, 200);
+  }
+
+  // Sin micrófono, el cronómetro se actualiza con su propio bucle
+  function bucleSinMic() {
+    if (micOK || fase !== 'corriendo') return;
+    crono.textContent = fmt(performance.now() - t0);
+    if (performance.now() - t0 > num('tMax') * 1000) { terminar(); return; }
+    requestAnimationFrame(bucleSinMic);
+  }
+
+  // ---------- Ejercicio ----------
+  function limpiar() { pararSirena(); timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = []; }
+  function setFase(f) {
+    fase = f;
+    boton.className = f === 'idle' ? '' : 'activo';
+    boton.textContent = f === 'idle' ? 'Inicio' : (f === 'corriendo' ? 'Parar' : 'Cancelar');
+    $('mNormal').disabled = $('mTq').disabled = f !== 'idle';
+  }
+  function disparo(ahora) {
+    ultimo = ahora; shots.push(ahora - t0);
+    estado.textContent = 'Disparo ' + shots.length + ': ' + fmt(shots[shots.length - 1]);
+    if (shots.length >= Math.max(1, Math.round(num('nDisp')))) terminar();
+  }
+  function terminar() {
+    if (fase !== 'corriendo') return;
+    var fin = performance.now() - t0;
+    if (shots.length === 0) shots.push(fin);
+    document.body.className = '';
+    crono.textContent = fmt(shots[shots.length - 1]);
+    if (modo === 'tq') { setFase('tqEspera'); estado.textContent = 'Atento al aviso…'; }
+    else { setFase('idle'); estado.textContent = 'Terminado'; }
+    mostrar(); guardar();
+  }
+  function mostrar() {
+    var splits = shots.map(function (t, i) { return i ? t - shots[i - 1] : t; });
+    var p = par() * 1000, filas = '';
+    shots.forEach(function (t, i) {
+      var cls = p ? (t <= p ? 'bueno' : 'malo') : '';
+      filas += '<tr><td>' + (i + 1) + '</td><td class="' + cls + '">' + fmt(t) + '</td><td>' + (i ? '+' + fmt(splits[i]) : '—') + '</td></tr>';
+    });
+    $('tabla').innerHTML = filas;
+    var rs = splits.slice(1), r = '<span>Primero<br><b>' + fmt(shots[0]) + '</b></span><span>Total<br><b>' + fmt(shots[shots.length - 1]) + '</b></span>';
+    if (rs.length) {
+      var suma = rs.reduce(function (a, b) { return a + b; }, 0);
+      r += '<span>Mejor split<br><b>' + fmt(Math.min.apply(null, rs)) + '</b></span><span>Media split<br><b>' + fmt(suma / rs.length) + '</b></span>';
+    }
+    $('resumen').innerHTML = r; $('resultado').hidden = false;
+  }
+
+  // ---------- Entrenamiento + TQ ----------
+  function programarHerido(mia) {
+    var a = Math.max(1, num('hMin')), b = Math.max(a, num('hMax'));
+    timers.push(setTimeout(function () { if (mia === token) herido(mia); }, (a + Math.random() * (b - a)) * 1000));
+  }
+  function herido(mia) {
+    if (fase === 'corriendo') terminar(); // cierra el registro de disparos
+    setFase('tqCuenta'); document.body.className = 'herido';
+    estado.textContent = '¡HERIDO! Torniquete';
+    crono.textContent = tqDur;
+    // La cuenta atrás arranca en el instante exacto en que empieza a sonar la voz
+    decir('¡Herido! ¡Herido!', true, function () {
+      if (mia !== token) return;
+      var fin = performance.now() + tqDur * 1000;
+      var iv = setInterval(function () {
+        if (mia !== token) { clearInterval(iv); return; }
+        var r = fin - performance.now();
+        if (r <= 0) { clearInterval(iv); finTQ(mia); return; }
+        crono.textContent = Math.ceil(r / 1000);
+      }, 100);
+      timers.push(iv);
+      estres(mia, fin, tqDur * 1000);
+    });
+  }
+  // Sonidos de estrés: latido que se acelera + tics agudos en los últimos 10 s
+  function estres(mia, fin, total) {
+    function paso() {
+      if (mia !== token) return;
+      var r = fin - performance.now();
+      if (r <= 400) return;
+      var p = 1 - r / total;
+      tono(180, 0.15, 1, 'triangle', 70);
+      timers.push(setTimeout(function () { if (mia === token) tono(160, 0.17, 0.8, 'triangle', 60); }, 170));
+      if (r < 10000) tono(1800, 0.07, 0.5, 'square');
+      timers.push(setTimeout(paso, 950 - 600 * p));
+    }
+    paso();
+    var frases = ['¡Herido! ¡Herido!', '¡Herido! ¡Herido!', '¡Rápido, rápido!'], k = 0;
+    // La voz se repite cada vez más seguido
+    repetir(mia, fin, total, function () { hablar(frases[k++ % frases.length]); }, function (p) { return 6500 - 2500 * p; });
+    // Sirenas de policía (dos tonos o barrido), cada vez más seguidas
+    sirenaContinua(total / 1000);
+    // Interferencias, más frecuentes y fuertes al final
+    repetir(mia, fin, total, function (p) { ruido(0.06 + Math.random() * 0.12, 0.25 + 0.35 * p); }, function (p) { return 600 + Math.random() * 1400 * (1 - p * 0.7); });
+  }
+  function repetir(mia, fin, total, fn, espera) {
+    function t() {
+      if (mia !== token) return;
+      var r = fin - performance.now();
+      if (r <= 600) return;
+      fn(1 - r / total);
+      timers.push(setTimeout(t, espera(1 - r / total)));
+    }
+    timers.push(setTimeout(t, espera(0)));
+  }
+  function hablar(txt) {
+    try {
+      var ss = speechSynthesis;
+      if (ss.speaking) return;
+      var u = new SpeechSynthesisUtterance(txt);
+      u.lang = 'es-ES'; u.volume = 1; u.rate = 1.15; u.pitch = 1.1;
+      if (vozES) u.voice = vozES;
+      ss.speak(u);
+    } catch (e) {}
+  }
+  function policia(vol) {
+    if (ctx.state !== 'running') ctx.resume();
+    var t = ctx.currentTime, dur = 2.6;
+    var o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth'; f.type = 'lowpass'; f.frequency.value = 2200;
+    if (Math.random() < 0.5) {
+      for (var i = 0; i < 6; i++) o.frequency.setValueAtTime(i % 2 ? 870 : 650, t + i * 0.43); // dos tonos
+    } else {
+      o.frequency.setValueAtTime(650, t);
+      for (var j = 0; j < 3; j++) { // barrido
+        o.frequency.linearRampToValueAtTime(1400, t + j * 0.87 + 0.43);
+        o.frequency.linearRampToValueAtTime(650, t + j * 0.87 + 0.87);
+      }
+    }
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.05);
+    g.gain.setValueAtTime(vol, t + dur - 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); f.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  var sirenaOsc = null;
+  function pararSirena() {
+    if (sirenaOsc) { try { sirenaOsc.stop(); } catch (e) {} sirenaOsc = null; }
+  }
+  // Sirena de policía ininterrumpida durante toda la cuenta atrás: alterna dos tonos y barrido
+  function sirenaContinua(seg) {
+    pararSirena();
+    if (ctx.state !== 'running') ctx.resume();
+    var t = ctx.currentTime, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth'; f.type = 'lowpass'; f.frequency.value = 2200;
+    var x = 0, dosTonos = true, i;
+    while (x < seg) {
+      if (dosTonos) {
+        for (i = 0; i < 8; i++) o.frequency.setValueAtTime(i % 2 ? 870 : 650, t + x + i * 0.43);
+        x += 8 * 0.43;
+      } else {
+        for (i = 0; i < 4; i++) {
+          var c = t + x + i * 0.87;
+          o.frequency.setValueAtTime(650, c);
+          o.frequency.linearRampToValueAtTime(1400, c + 0.43);
+          o.frequency.linearRampToValueAtTime(650, c + 0.87);
+        }
+        x += 4 * 0.87;
+      }
+      dosTonos = !dosTonos;
+    }
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.25, t + 0.1);
+    g.gain.linearRampToValueAtTime(0.5, t + seg);
+    o.connect(f); f.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + seg);
+    sirenaOsc = o;
+  }
+  function ruido(dur, vol) {
+    if (ctx.state !== 'running') ctx.resume();
+    var n = Math.floor(ctx.sampleRate * dur), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    var s = ctx.createBufferSource(), g = ctx.createGain();
+    s.buffer = b; g.gain.value = vol; s.connect(g); g.connect(ctx.destination); s.start();
+  }
+  function finTQ(mia) {
+    crono.textContent = '0'; estado.textContent = '¡TIEMPO!';
+    for (var i = 0; i < 6; i++) (function (i) {
+      timers.push(setTimeout(function () { if (mia === token) pitido(2800, 0.3); }, i * 450));
+    })(i);
+    timers.push(setTimeout(function () {
+      if (mia !== token) return;
+      setFase('idle'); document.body.className = '';
+    }, 6 * 450));
+  }
+  function setModo(m) {
+    if (fase !== 'idle') return;
+    modo = m; document.body.dataset.modo = m;
+    $('mNormal').setAttribute('aria-pressed', m === 'normal');
+    $('mTq').setAttribute('aria-pressed', m === 'tq');
+    estado.textContent = 'Pulsa Inicio'; crono.textContent = '0.00'; document.body.className = '';
+  }
+  $('mNormal').addEventListener('click', function () { setModo('normal'); });
+  $('mTq').addEventListener('click', function () { setModo('tq'); });
+  $('tqDur').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    tqDur = parseInt(b.dataset.s, 10);
+    Array.prototype.forEach.call($('tqDur').children, function (x) { x.setAttribute('aria-pressed', x === b); });
+  });
+
+  function empezar() {
+    var mia = ++token;
+    shots = []; parSonado = false; $('resultado').hidden = true;
+    var resto = 5;
+    setFase('cuenta'); document.body.className = '';
+    estado.textContent = 'Prepárate…'; crono.textContent = resto; pitido(1000, 0.12);
+    var iv = setInterval(function () {
+      if (mia !== token) return;
+      resto--;
+      if (resto > 0) { crono.textContent = resto; pitido(1000, 0.12); return; }
+      clearInterval(iv);
+      crono.textContent = '0.00';
+      decir('Preparado'); estado.textContent = 'Preparado'; document.body.className = 'ready';
+      setFase('espera');
+      var a = Math.max(0.5, num('dMin')), b = Math.max(a, num('dMax'));
+      var espera = (a + Math.random() * (b - a)) * 1000;
+      timers.push(setTimeout(function () {
+        if (mia !== token) return;
+        ctx.resume();
+        t0 = performance.now(); ultimo = t0;
+        pitido(2800, 0.3);
+        setFase('corriendo'); document.body.className = 'go';
+        estado.textContent = '¡Dispara!';
+        if (!micOK) bucleSinMic();
+        if (modo === 'tq') programarHerido(mia);
+      }, espera));
+    }, 1000);
+    timers.push(iv);
+  }
+
+  boton.addEventListener('click', async function () {
+    initAudio(); ctx.resume();
+    if (fase === 'corriendo') { terminar(); return; }
+    if (fase !== 'idle') { token++; limpiar(); try { speechSynthesis.cancel(); } catch (e) {} setFase('idle'); document.body.className = ''; estado.textContent = 'Cancelado'; crono.textContent = '0.00'; return; }
+    desbloquearVoz();
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(function () {}); } catch (e) {}
+    await iniciarMic();
+    ctx.resume();
+    empezar();
+  });
+  // Alternativa sin micrófono: tocar el cronómetro marca el disparo
+  crono.style.cursor = 'pointer';
+  crono.addEventListener('click', function () { if (fase === 'corriendo') disparo(performance.now()); });
+  $('probarMic').addEventListener('click', function () { initAudio(); ctx.resume(); iniciarMic(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' && !/INPUT|BUTTON|SUMMARY/.test(e.target.tagName)) { e.preventDefault(); boton.click(); }
+  });
+
+  // ---------- Historial ----------
+  function leer() { try { return JSON.parse(localStorage.getItem('tiroSeco') || '[]'); } catch (e) { return []; } }
+  function guardar() {
+    var h = leer();
+    h.unshift({ d: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      p: shots[0], t: shots[shots.length - 1], n: shots.length });
+    try { localStorage.setItem('tiroSeco', JSON.stringify(h.slice(0, 10))); } catch (e) {}
+    pintaHist();
+  }
+  function pintaHist() {
+    var h = leer(); $('histPanel').hidden = !h.length;
+    $('hist').innerHTML = h.map(function (x) {
+      return '<tr><td>' + x.d + '</td><td>' + fmt(x.p) + '</td><td>' + fmt(x.t) + '</td><td>' + x.n + '</td></tr>';
+    }).join('');
+  }
+  $('borrar').addEventListener('click', function () { try { localStorage.removeItem('tiroSeco'); } catch (e) {} pintaHist(); });
+  pintaHist();
+})();
+</script>
+</body>
+</html>
