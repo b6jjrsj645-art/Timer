@@ -38,7 +38,7 @@
   .resumen { display:flex; gap:1.2em; flex-wrap:wrap; font-size:1.1rem; margin:.4em 0 .8em; }
   .resumen span b { font-size:1.35em; }
   .modos { display:flex; flex-wrap:wrap; gap:.5em; width:min(94vw,760px); }
-  #mInt, #mCc, #mTot { flex-basis:100%; }
+  #mTq, #mInt, #mCc, #mTot { flex-basis:100%; }
   .modos button, .opciones button { flex:1; font:inherit; font-weight:700; border:2px solid var(--ink); background:transparent;
     color:var(--ink); border-radius:.3em; cursor:pointer; padding:.6em .4em; font-size:clamp(1rem,3.8vw,1.35rem); }
   .opciones { display:flex; gap:.4em; }
@@ -61,6 +61,7 @@
   <div id="flash"></div>
   <div class="modos">
     <button id="mNormal" aria-pressed="true">Timer</button>
+    <button id="mUni" aria-pressed="false">Único tiro</button>
     <button id="mTq" aria-pressed="false">Entrenamiento + TQ</button>
     <button id="mInt" aria-pressed="false">Entrenamiento + Interrupción</button>
     <button id="mCc" aria-pressed="false">Entrenamiento + Cambio de cargador</button>
@@ -314,7 +315,7 @@
     fase = f;
     boton.className = f === 'idle' ? '' : 'activo';
     boton.textContent = f === 'idle' ? 'Inicio' : ((f === 'corriendo' || f === 'intCorriendo' || f === 'ccCorriendo' || f === 'totCorriendo' || f === 'tqCuenta') ? 'Parar' : 'Cancelar');
-    $('mNormal').disabled = $('mTq').disabled = $('mInt').disabled = $('mCc').disabled = $('mTot').disabled = f !== 'idle';
+    $('mNormal').disabled = $('mTq').disabled = $('mInt').disabled = $('mCc').disabled = $('mTot').disabled = $('mUni').disabled = f !== 'idle';
   }
   function disparo(ahora) {
     ultimo = ahora; shots.push(ahora - t0); destello();
@@ -322,7 +323,7 @@
     estado.textContent = 'Disparo ' + n + ': ' + fmt(tt) + (n > 1 ? '  (+' + fmt(tt - shots[n - 2]) + ')' : '');
     mostrar(); // la tabla se actualiza con cada disparo
     if (modo === 'cc') return;
-    var lim = Math.round(num('nDisp'));
+    var lim = modo === 'unico' ? 1 : Math.round(num('nDisp'));
     if (lim > 0 && n >= lim) terminar();
   }
   function terminar() {
@@ -698,6 +699,7 @@
     $('mInt').setAttribute('aria-pressed', m === 'int');
     $('mCc').setAttribute('aria-pressed', m === 'cc');
     $('mTot').setAttribute('aria-pressed', m === 'total');
+    $('mUni').setAttribute('aria-pressed', m === 'unico');
     estado.textContent = 'Pulsa Inicio'; crono.textContent = '0.00'; document.body.className = '';
   }
   $('mNormal').addEventListener('click', function () { setModo('normal'); });
@@ -705,6 +707,7 @@
   $('mInt').addEventListener('click', function () { setModo('int'); });
   $('mCc').addEventListener('click', function () { setModo('cc'); });
   $('mTot').addEventListener('click', function () { setModo('total'); });
+  $('mUni').addEventListener('click', function () { setModo('unico'); });
   $('tqDur').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     tqDur = parseInt(b.dataset.s, 10);
