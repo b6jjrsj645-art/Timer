@@ -2,66 +2,95 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Timer de tiro en seco</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a111f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Timer táctico">
+<title>Timer táctico · Tiro en seco</title>
 <style>
-  :root { --paper:#f4f1ea; --ink:#16181c; --hit:#c8281e; --ok:#1f7a45; --mute:#6b6f76; --line:#d6d1c4; }
-  * { box-sizing:border-box; }
-  body { margin:0; min-height:100vh; background:var(--paper); color:var(--ink);
+  :root { color-scheme:dark; --bg:#0a111f; --panel:#111c33; --line:#243556; --ink:#e8eef9; --mute:#8fa2c4;
+    --acc:#2f7bff; --amb:#ffb020; --ok:#4ade80; --hit:#ff4d4d; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; }
+  body { min-height:100vh; background:var(--bg); color:var(--ink);
     font-family:"Bahnschrift","Segoe UI","Helvetica Neue",Arial,sans-serif;
-    display:flex; flex-direction:column; align-items:center; gap:2vh; padding:2vh 3vw 4vh;
-    transition:background .15s; }
-  body.ready { background:#f3e6a6; }
-  body.go { background:#bfe2c4; }
-  #estado { font-size:clamp(1.6rem,6vw,3rem); font-weight:700; text-align:center; min-height:1.2em; }
-  #crono { font-size:clamp(5rem,26vw,15rem); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
-  #inicio { font:inherit; font-size:clamp(2rem,8vw,4.5rem); font-weight:700; width:min(94vw,760px);
-    padding:.45em 1em; border:0; border-radius:.3em; background:var(--ink); color:var(--paper); cursor:pointer; }
+    display:flex; flex-direction:column; align-items:center; gap:1.6vh;
+    padding:max(2vh,env(safe-area-inset-top)) 3vw max(4vh,env(safe-area-inset-bottom)); transition:background .15s; }
+  body.ready { background:#2b2208; }
+  body.go { background:#08331c; }
+  body.herido { background:#3d0f12; }
+  .cab { width:min(94vw,760px); display:flex; align-items:center; gap:.8em; padding-bottom:.55em; border-bottom:2px solid var(--acc); }
+  .ins { width:2.9em; height:2.9em; flex:none; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+  .ins svg { width:100%; height:100%; display:block; }
+  .cab h1 { margin:0; font-size:clamp(1.05rem,4.8vw,1.55rem); letter-spacing:.14em; text-transform:uppercase; }
+  .cab p { margin:.15em 0 0; font-size:.74rem; color:var(--mute); letter-spacing:.09em; text-transform:uppercase; }
+  .bandera { flex:1; min-width:0; height:1.7em; margin-left:.9em; border-radius:.15em; box-shadow:0 1px 4px rgba(0,0,0,.6); }
+  .modos { display:grid; grid-template-columns:1fr 1fr; gap:.5em; width:min(94vw,760px); }
+  #mTot { grid-column:1 / -1; }
+  .modos button, .opciones button { font:inherit; font-weight:700; cursor:pointer; touch-action:manipulation;
+    color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:.4em;
+    padding:.7em .4em; font-size:clamp(.82rem,3.4vw,1.05rem); }
+  .modos button[aria-pressed="true"], .opciones button[aria-pressed="true"] { background:var(--acc); border-color:var(--acc); color:#fff; }
+  .modos button:disabled { opacity:.4; cursor:default; }
+  .modos button { text-transform:uppercase; letter-spacing:.04em; font-size:clamp(.72rem,3.05vw,.98rem); }
+  .opciones { display:flex; gap:.4em; }
+  .opciones button { flex:1; padding:.4em .8em; font-size:1.05rem; }
+  #estado { font-size:clamp(1.4rem,5.6vw,2.6rem); font-weight:700; text-align:center; min-height:1.2em; padding:0 1rem; }
+  #crono { font-size:clamp(4.2rem,21vw,12rem); font-weight:800; line-height:1.05; font-variant-numeric:tabular-nums;
+    width:min(94vw,760px); text-align:center; padding:.08em .1em; background:var(--panel); border:2px solid var(--acc);
+    border-radius:.12em; box-shadow:inset 0 0 0 1px #060b16; user-select:none; -webkit-user-select:none; }
+  .objetivo { display:flex; align-items:center; justify-content:center; gap:1.2rem; width:min(94vw,760px);
+    background:var(--panel); border:1px solid var(--line); border-radius:.5em; padding:.6em 1em; }
+  .objetivo[hidden] { display:none; }
+  .objetivo svg { width:clamp(80px,26vw,150px); height:auto; flex:none; }
+  .zona { font-size:clamp(2rem,9vw,4rem); font-weight:800; letter-spacing:.07em; color:var(--amb); }
+  #inicio { font:inherit; font-size:clamp(2rem,8vw,4.2rem); font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    width:min(94vw,760px); padding:.45em 1em; border:0; border-radius:.3em; background:var(--acc); color:#fff;
+    cursor:pointer; touch-action:manipulation; }
   #inicio.activo { background:var(--hit); }
-  button:focus-visible, input:focus-visible, summary:focus-visible { outline:3px solid var(--hit); outline-offset:3px; }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline:3px solid var(--amb); outline-offset:3px; }
   .panel { width:min(94vw,760px); }
-  .medidor { height:14px; background:#fff; border:1px solid var(--line); position:relative; border-radius:7px; overflow:hidden; }
-  .medidor i { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--mute); }
+  .medidor { height:14px; background:#060b16; border:1px solid var(--line); position:relative; border-radius:7px; overflow:hidden; }
+  .medidor i { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--acc); }
   .medidor b { position:absolute; top:0; bottom:0; width:3px; background:var(--hit); }
-  .etq { font-size:.95rem; color:var(--mute); margin:.3em 0 0; }
-  details { background:#fff; border:1px solid var(--line); border-radius:.4em; padding:.6em 1em; }
-  summary { cursor:pointer; font-weight:700; }
+  .etq { font-size:.92rem; color:var(--mute); margin:.3em 0 0; }
+  details { background:var(--panel); border:1px solid var(--line); border-radius:.4em; padding:.6em 1em; }
+  summary { cursor:pointer; font-weight:700; text-transform:uppercase; letter-spacing:.08em; font-size:.95rem; }
   .cfg { display:grid; grid-template-columns:1fr auto; gap:.6em 1em; align-items:center; margin-top:.8em; }
-  .cfg input[type=number] { width:5.5em; font:inherit; padding:.3em; text-align:right; }
+  .cfg input[type=number] { width:5.5em; font:inherit; padding:.3em; text-align:right; color:var(--ink);
+    background:#060b16; border:1px solid var(--line); border-radius:.3em; }
+  .cfg select { font:inherit; padding:.35em; color:var(--ink); background:#060b16; border:1px solid var(--line); border-radius:.3em; }
   .cfg input[type=range] { width:100%; grid-column:1 / -1; }
-  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:1.15rem; }
-  td, th { padding:.35em .5em; border-bottom:1px solid var(--line); text-align:right; }
+  .cfg input[type=checkbox] { width:1.7em; height:1.7em; justify-self:end; accent-color:var(--acc); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:1.12rem; }
+  td, th { padding:.4em .5em; border-bottom:1px solid var(--line); text-align:right; }
   th:first-child, td:first-child { text-align:left; }
-  th { color:var(--mute); font-weight:600; font-size:.9rem; }
+  th { color:var(--mute); font-weight:600; font-size:.85rem; text-transform:uppercase; letter-spacing:.06em; }
   .bueno { color:var(--ok); font-weight:700; }
   .malo { color:var(--hit); font-weight:700; }
-  .resumen { display:flex; gap:1.2em; flex-wrap:wrap; font-size:1.1rem; margin:.4em 0 .8em; }
-  .resumen span b { font-size:1.35em; }
-  .modos { display:flex; flex-wrap:wrap; gap:.5em; width:min(94vw,760px); }
-  #mTq, #mInt, #mCc, #mTot { flex-basis:100%; }
-  .modos button, .opciones button { flex:1; font:inherit; font-weight:700; border:2px solid var(--ink); background:transparent;
-    color:var(--ink); border-radius:.3em; cursor:pointer; padding:.6em .4em; font-size:clamp(1rem,3.8vw,1.35rem); }
-  .opciones { display:flex; gap:.4em; }
-  .opciones button { padding:.35em .8em; font-size:1.05rem; }
-  .modos button[aria-pressed="true"], .opciones button[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
-  .modos button:disabled { opacity:.45; cursor:default; }
-  body.herido { background:#efaaa1; }
+  .resumen { display:flex; gap:1.2em; flex-wrap:wrap; font-size:1rem; margin:.4em 0 .8em; color:var(--mute); }
+  .resumen span b { font-size:1.4em; color:var(--ink); }
   body:not([data-modo="tq"]) .solotq { display:none; }
   body:not([data-modo="int"]) .soloint { display:none; }
   body:not([data-modo="cc"]) .solocc { display:none; }
   body:not([data-modo="total"]) .solototal { display:none; }
   body:not([data-modo="tq"]):not([data-modo="total"]) .solotqdur { display:none; }
-  .cfg input[type=checkbox] { width:1.7em; height:1.7em; justify-self:end; }
+  body:not([data-modo="obj"]):not([data-modo="total"]) .soloobj { display:none; }
   #flash { position:fixed; inset:0; background:#2fd36b; opacity:0; pointer-events:none; z-index:50; transition:opacity .3s ease-out; }
   #flash.on { opacity:.5; transition:none; }
-  .linkbtn { font:inherit; background:none; border:0; color:var(--hit); cursor:pointer; text-decoration:underline; padding:0; }
+  .linkbtn { font:inherit; background:none; border:0; color:var(--amb); cursor:pointer; text-decoration:underline; padding:0; }
+  .firma { text-align:center; margin:2vh 0 0; font-weight:600; color:var(--mute); letter-spacing:.08em; font-size:.85rem; text-transform:uppercase; }
 </style>
 </head>
 <body data-modo="normal">
   <div id="flash"></div>
+  <header class="cab"><div class="ins"><svg viewBox="0 0 100 100" aria-label="Culote de vaina"><defs><radialGradient id="latonG" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#f3d36b"/><stop offset="1" stop-color="#a87a1c"/></radialGradient><radialGradient id="cebG" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#e9edf2"/><stop offset="1" stop-color="#8d949c"/></radialGradient></defs><circle cx="50" cy="50" r="48" fill="url(#latonG)" stroke="#6f4f0e" stroke-width="2"/><circle cx="50" cy="50" r="39" fill="none" stroke="#6f4f0e" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="url(#latonG)"/><circle cx="50" cy="50" r="18" fill="url(#cebG)" stroke="#5d636b" stroke-width="2"/><circle cx="50" cy="50" r="6" fill="#6d737b"/></svg></div><div><h1>Timer táctico</h1><p>Tiro en seco · entrenamiento policial</p></div><svg class="bandera" viewBox="0 0 60 40" preserveAspectRatio="none" role="img" aria-label="Bandera de España"><rect width="60" height="40" fill="#c60b1e"/><rect y="10" width="60" height="20" fill="#ffc400"/></svg></header>
   <div class="modos">
     <button id="mNormal" aria-pressed="true">Timer</button>
     <button id="mUni" aria-pressed="false">Único tiro</button>
+    <button id="mObj" aria-pressed="false">Objetivo (una sola indicación al azar)</button>
     <button id="mTq" aria-pressed="false">Entrenamiento + TQ</button>
     <button id="mInt" aria-pressed="false">Entrenamiento + Interrupción</button>
     <button id="mCc" aria-pressed="false">Entrenamiento + Cambio de cargador</button>
@@ -69,6 +98,7 @@
   </div>
   <div id="estado">Pulsa Inicio</div>
   <div id="crono" aria-live="off">0.00</div>
+  <div class="objetivo" id="objetivo" hidden></div>
   <button id="inicio">Inicio</button>
 
   <div class="panel">
@@ -109,14 +139,20 @@
         <label class="soloint" for="iMax">"Interrupción" suena como tarde (s tras el pitido)</label><input class="soloint" type="number" id="iMax" value="10" min="1" max="90" step="0.5">
         <label class="solocc" for="cMin">"Cambio de cargador" suena como pronto (s tras el pitido)</label><input class="solocc" type="number" id="cMin" value="3" min="1" max="60" step="0.5">
         <label class="solocc" for="cMax">"Cambio de cargador" suena como tarde (s tras el pitido)</label><input class="solocc" type="number" id="cMax" value="10" min="1" max="90" step="0.5">
-        <label class="solototal" for="pasosMin">Pasos del ejercicio, mínimo (el primero siempre es disparo)</label><input class="solototal" type="number" id="pasosMin" value="2" min="1" max="30" step="1">
-        <label class="solototal" for="pasosMax">Pasos del ejercicio, máximo (la longitud se sortea cada vez)</label><input class="solototal" type="number" id="pasosMax" value="5" min="1" max="30" step="1">
-        <label class="solototal" for="pMin">Pausa entre pasos, mínimo (s)</label><input class="solototal" type="number" id="pMin" value="2" min="1" max="60" step="0.5">
-        <label class="solototal" for="pMax">Pausa entre pasos, máximo (s)</label><input class="solototal" type="number" id="pMax" value="6" min="1" max="90" step="0.5">
+        <label class="solototal" for="estilo">Estilo del ejercicio</label><select class="solototal" id="estilo"><option value="tactico" selected>Escenarios tácticos (2-3 órdenes)</option><option value="libre">Aleatorio libre</option></select>
+        <label class="solototal" for="pasosMin">Estilo libre: pasos mínimo</label><input class="solototal" type="number" id="pasosMin" value="2" min="1" max="30" step="1">
+        <label class="solototal" for="pasosMax">Estilo libre: pasos máximo</label><input class="solototal" type="number" id="pasosMax" value="3" min="1" max="30" step="1">
+        <label class="solototal" for="pMin">Pausa entre pasos, mínimo (s)</label><input class="solototal" type="number" id="pMin" value="1.5" min="1" max="60" step="0.5">
+        <label class="solototal" for="pMax">Pausa entre pasos, máximo (s)</label><input class="solototal" type="number" id="pMax" value="4" min="1" max="90" step="0.5">
         <label class="solototal" for="k_disparo">Incluir: Disparo</label><input class="solototal" type="checkbox" id="k_disparo" checked>
         <label class="solototal" for="k_tq">Incluir: Torniquete</label><input class="solototal" type="checkbox" id="k_tq" checked>
         <label class="solototal" for="k_int">Incluir: Interrupción</label><input class="solototal" type="checkbox" id="k_int" checked>
         <label class="solototal" for="k_cc">Incluir: Cambio de cargador</label><input class="solototal" type="checkbox" id="k_cc" checked>
+        <label class="solototal" for="k_obj">Incluir: Objetivo (único tiro identificado)</label><input class="solototal" type="checkbox" id="k_obj" checked>
+        <label class="soloobj" for="o_zona">Objetivo al azar: incluir zona (cabeza / pecho)</label><input class="soloobj" type="checkbox" id="o_zona" checked>
+        <label class="soloobj" for="o_num">Objetivo al azar: incluir número (1 a 4)</label><input class="soloobj" type="checkbox" id="o_num" checked>
+        <label class="soloobj" for="o_forma">Objetivo al azar: incluir forma (círculo, cuadrado, triángulo, rombo)</label><input class="soloobj" type="checkbox" id="o_forma" checked>
+        <label class="soloobj" for="o_color">Objetivo al azar: incluir color (azul, verde, amarillo, rojo)</label><input class="soloobj" type="checkbox" id="o_color" checked>
       </div>
       <p class="etq">Tip: en tiro en seco, el clic del disparador es bajo. Pulsa "Probar micrófono" y haz tu clic: la barra debe pasar la línea roja y avisar "Sonido detectado". Si no, sube la sensibilidad; si salta con el ruido ambiente, bájala.</p>
     </details>
@@ -130,7 +166,7 @@
     </details>
   </div>
 
-  <p class="etq" style="text-align:center;margin:2vh 0 0;font-weight:600;">Creado por Guillermo Camacho</p>
+  <p class="firma">Creado por Guillermo Camacho</p>
 
 <script>
 (function () {
@@ -317,7 +353,7 @@
     fase = f;
     boton.className = f === 'idle' ? '' : 'activo';
     boton.textContent = f === 'idle' ? 'Inicio' : ((f === 'corriendo' || f === 'intCorriendo' || f === 'ccCorriendo' || f === 'totCorriendo' || f === 'tqCuenta') ? 'Parar' : 'Cancelar');
-    $('mNormal').disabled = $('mTq').disabled = $('mInt').disabled = $('mCc').disabled = $('mTot').disabled = $('mUni').disabled = f !== 'idle';
+    $('mNormal').disabled = $('mTq').disabled = $('mInt').disabled = $('mCc').disabled = $('mTot').disabled = $('mUni').disabled = $('mObj').disabled = f !== 'idle';
   }
   function disparo(ahora) {
     ultimo = ahora; shots.push(ahora - t0); destello();
@@ -325,7 +361,7 @@
     estado.textContent = 'Disparo ' + n + ': ' + fmt(tt) + (n > 1 ? '  (+' + fmt(tt - shots[n - 2]) + ')' : '');
     mostrar(); // la tabla se actualiza con cada disparo
     if (modo === 'cc') return;
-    var lim = modo === 'unico' ? 1 : Math.round(num('nDisp'));
+    var lim = (modo === 'unico' || modo === 'obj') ? 1 : Math.round(num('nDisp'));
     if (lim > 0 && n >= lim) terminar();
   }
   function terminar() {
@@ -352,6 +388,7 @@
       r += '<span>Mejor split<br><b>' + fmt(Math.min.apply(null, rs)) + '</b></span><span>Media split<br><b>' + fmt(suma / rs.length) + '</b></span>';
     }
     if (interrTiempo !== null) r += '<span>Interrupción<br><b>' + fmt(interrTiempo) + '</b></span>';
+    if (modo === 'obj' && objTxt) r += '<span>Objetivo<br><b>' + objTxt + '</b></span>';
     if (ccTiempo !== null) r += '<span>Cambio de cargador<br><b>' + fmt(ccTiempo) + '</b></span>';
     $('resumen').innerHTML = r; $('resultado').hidden = false;
   }
@@ -558,20 +595,115 @@
       estado.textContent = 'Torniquete colocado' + (tqZona ? ' (' + tqZona + ')' : '') + ': ' + fmt(t) + ' s';
     }
   }
+  // ---------- Objetivo: zona, número, forma y color ----------
+  var objTxt = '';
+  var ZON = ['cabeza', 'pecho'], NUMS = [1, 2, 3, 4], PAL = ['uno', 'dos', 'tres', 'cuatro'];
+  var FORMAS = ['círculo', 'cuadrado', 'triángulo', 'rombo'];
+  var COLORES = [{ n: 'azul', c: '#2f7bff' }, { n: 'verde', c: '#22c55e' }, { n: 'amarillo', c: '#ffd23f' }, { n: 'rojo', c: '#ff4d4d' }];
+  function elige(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function sortearObjetivo(forz) {
+    if (forz && forz.zona) return { zona: forz.zona };
+    // Una sola indicación cada vez: se sortea la categoría y luego el valor
+    var cat = [];
+    if ($('o_zona').checked) cat.push('zona');
+    if ($('o_num').checked) cat.push('num');
+    if ($('o_forma').checked) cat.push('forma');
+    if ($('o_color').checked) cat.push('color');
+    if (!cat.length) cat = ['zona'];
+    var k = elige(cat), o = {};
+    if (k === 'zona') o.zona = elige(ZON);
+    else if (k === 'num') o.num = elige(NUMS);
+    else if (k === 'forma') o.forma = elige(FORMAS);
+    else o.color = elige(COLORES);
+    return o;
+  }
+  function resumenObjetivo(o) {
+    var p = [];
+    if (o.num) p.push(o.num);
+    if (o.forma) p.push(o.forma);
+    if (o.color) p.push(o.color.n);
+    if (o.zona) p.push(o.zona);
+    return p.join(' · ');
+  }
+  function vozObjetivo(o) {
+    var p = [];
+    if (o.num) p.push(PAL[o.num - 1]);
+    if (o.forma) p.push(o.forma);
+    if (o.color) p.push(o.color.n);
+    if (o.zona) p.push(o.zona);
+    return p.join(', ');
+  }
+  function mostrarObjetivo(o) {
+    var c = o.color ? o.color.c : '#8fa2c4', f = o.forma || 'cuadrado', sh, svg = '';
+    if (o.forma || o.num || o.color) {
+      sh = f === 'círculo' ? '<circle cx="50" cy="50" r="44" fill="' + c + '"/>'
+        : f === 'cuadrado' ? '<rect x="8" y="8" width="84" height="84" rx="6" fill="' + c + '"/>'
+        : f === 'triángulo' ? '<polygon points="50,6 96,92 4,92" fill="' + c + '"/>'
+        : '<polygon points="50,2 98,50 50,98 2,50" fill="' + c + '"/>';
+      var num = o.num ? '<text x="50" y="' + (f === 'triángulo' ? 82 : 64) + '" text-anchor="middle" font-size="' + (f === 'triángulo' ? 36 : 46) +
+        '" font-weight="800" fill="#0a111f" font-family="Arial,sans-serif">' + o.num + '</text>' : '';
+      svg = '<svg viewBox="0 0 100 100" aria-hidden="true">' + sh + num + '</svg>';
+    }
+    $('objetivo').innerHTML = svg + (o.zona ? '<div class="zona">' + o.zona.toUpperCase() + '</div>' : '');
+    $('objetivo').hidden = false;
+  }
+  // Habla y avisa cuando termina (con salida de seguridad a los 5 s)
+  function decirYEsperar(txt, mia, alFin) {
+    var hecho = false;
+    function fin() { if (hecho || mia !== token) return; hecho = true; alFin(); }
+    try {
+      var ss = speechSynthesis;
+      if (ss.paused) ss.resume();
+      if (ss.speaking || ss.pending) ss.cancel();
+      var u = new SpeechSynthesisUtterance(txt);
+      u.lang = 'es-ES'; u.volume = 1; u.rate = 1.15; if (vozES) u.voice = vozES;
+      u.onend = fin; u.onerror = fin;
+      ss.speak(u);
+    } catch (e) {}
+    timers.push(setTimeout(fin, 5000));
+  }
+  // Muestra y dice el objetivo; el pitido (cb) llega justo después
+  function anunciarObjetivo(mia, cb, forz) {
+    var o = sortearObjetivo(forz); objTxt = resumenObjetivo(o);
+    mostrarObjetivo(o);
+    estado.textContent = (modo === 'total' ? prefijo() : '') + objTxt.toUpperCase();
+    document.body.className = 'ready';
+    decirYEsperar(vozObjetivo(o), mia, function () { if (mia === token) cb(); }); // el pitido sale en cuanto acaba la voz
+  }
   // ---------- Entrenamiento total (ejercicios aleatorios encadenados) ----------
   var totEtapas = [], totKind = '', tS = 0;
-  var NOMBRES = { disparo: 'Disparo', cc: 'Cambio de cargador', int: 'Interrupción', tq: 'Torniquete' };
+  var NOMBRES = { obj: 'Objetivo', disparo: 'Disparo', cc: 'Cambio de cargador', int: 'Interrupción', tq: 'Torniquete' };
   function activos() {
     var a = [];
-    ['disparo', 'tq', 'int', 'cc'].forEach(function (k) { if ($('k_' + k).checked) a.push(k); });
+    ['disparo', 'tq', 'int', 'cc', 'obj'].forEach(function (k) { if ($('k_' + k).checked) a.push(k); });
     return a.length ? a : ['disparo'];
   }
-  var totObjetivo = 2;
-  function totPasos() { return totObjetivo; }
-  // La longitud de cada ejercicio se sortea entre el mínimo y el máximo: puede cortarse en cualquier paso
-  function sortearPasos() {
+  // Escenarios tácticos de 2 a 3 órdenes: disparo + continuación lógica (hemorragia, recarga, interrupción, doble impacto)
+  var ESCENARIOS = [
+    [{ k: 'obj', zona: 'pecho' }, { k: 'tq' }],
+    [{ k: 'obj', zona: 'cabeza' }, { k: 'cc' }],
+    [{ k: 'obj', zona: 'pecho' }, { k: 'obj', zona: 'cabeza' }],
+    [{ k: 'obj', zona: 'pecho' }, { k: 'cc' }, { k: 'obj', zona: 'cabeza' }],
+    [{ k: 'obj', zona: 'pecho' }, { k: 'int' }, { k: 'obj', zona: 'pecho' }],
+    [{ k: 'obj', zona: 'pecho' }, { k: 'cc' }, { k: 'tq' }],
+    [{ k: 'obj' }, { k: 'tq' }],
+    [{ k: 'obj' }, { k: 'int' }],
+    [{ k: 'disparo' }, { k: 'cc' }]
+  ];
+  var plan = [];
+  function totPasos() { return plan.length; }
+  // Se construye al empezar: un escenario táctico, o una cadena corta al azar (estilo libre)
+  function construirPlan() {
+    var on = {};
+    activos().forEach(function (k) { on[k] = true; });
+    if ($('estilo').value === 'tactico') {
+      var ok = ESCENARIOS.filter(function (sc) { return sc.every(function (p) { return on[p.k]; }); });
+      if (ok.length) { plan = elige(ok).slice(); return; }
+    }
     var a = Math.max(1, Math.round(num('pasosMin'))), b = Math.max(a, Math.round(num('pasosMax')));
-    totObjetivo = a + Math.floor(Math.random() * (b - a + 1));
+    var n = a + Math.floor(Math.random() * (b - a + 1)), resto = activos();
+    plan = [{ k: on.obj ? 'obj' : 'disparo' }];
+    while (plan.length < n) plan.push({ k: elige(resto) });
   }
   function prefijo() { return 'Paso ' + (totEtapas.length + 1) + ': '; }
   function renderTot() {
@@ -582,13 +714,23 @@
   }
   function programarSiguiente(mia) {
     var a = Math.max(1, num('pMin')), b = Math.max(a, num('pMax'));
-    var k = activos(), kind = k[Math.floor(Math.random() * k.length)];
+    var paso = plan[totEtapas.length] || { k: 'disparo' }, kind = paso.k;
     setFase('totEspera'); document.body.className = '';
     estado.textContent = prefijo() + 'Atento al aviso…';
-    timers.push(setTimeout(function () { if (mia === token) arrancarEtapa(kind, mia); }, (a + Math.random() * (b - a)) * 1000));
+    timers.push(setTimeout(function () { if (mia === token) arrancarEtapa(kind, mia, paso); }, (a + Math.random() * (b - a)) * 1000));
   }
-  function arrancarEtapa(kind, mia) {
+  function arrancarEtapa(kind, mia, paso) {
     totKind = kind;
+    $('objetivo').hidden = true;
+    if (kind === 'obj') { // se anuncia el objetivo justo antes del pitido; único tiro
+      anunciarObjetivo(mia, function () {
+        setFase('totCorriendo'); document.body.className = 'herido';
+        tS = performance.now(); ignoraHasta = tS + 450; pitido(2800, 0.3);
+        estado.textContent = prefijo() + '¡DISPARA!';
+        if (!micOK) bucleTotSinMic();
+      }, paso);
+      return;
+    }
     if (kind === 'tq') { herido(mia); return; } // voz + cuenta atrás con sonidos de estrés
     setFase('totCorriendo'); document.body.className = 'herido';
     tS = performance.now();
@@ -596,7 +738,7 @@
       ignoraHasta = tS + 450; pitido(2800, 0.3);
       estado.textContent = prefijo() + '¡DISPARA!';
     } else {
-      ignoraHasta = tS + 2600; pitido(1800, 0.35);
+      ignoraHasta = tS + 2200; pitido(1800, 0.35);
       var txt = kind === 'cc' ? '¡Cambio de cargador!' : '¡Interrupción!';
       estado.textContent = prefijo() + txt.toUpperCase();
       timers.push(setTimeout(function () { if (mia === token) hablarAviso(txt); }, 400));
@@ -614,7 +756,7 @@
     if (fase !== 'totCorriendo') return;
     destello();
     var t = ahora - tS; ultimo = ahora;
-    totEtapas.push({ n: NOMBRES[totKind], t: fmt(t) + ' s' });
+    totEtapas.push({ n: totKind === 'obj' ? 'Objetivo · ' + objTxt : NOMBRES[totKind], t: fmt(t) + ' s' });
     crono.textContent = fmt(t);
     renderTot();
     etapaTerminada(token);
@@ -645,10 +787,10 @@
   function cambioCargador(mia) {
     if (fase === 'corriendo') terminar(); // cierra el registro de disparos
     setFase('ccCorriendo'); document.body.className = 'herido';
-    tC = performance.now(); ignoraHasta = tC + 2600; // no escucha su propio pitido y voz
+    tC = performance.now(); ignoraHasta = tC + 2200; // no escucha su propio pitido y voz
     if (ctx.state !== 'running') ctx.resume();
     pitido(1800, 0.35);
-    estado.textContent = '¡CAMBIO DE CARGADOR! Dispara al terminar';
+    estado.textContent = '¡CAMBIO DE CARGADOR! Dispara, o di "¡Ya!" / "¡Stop!"';
     timers.push(setTimeout(function () {
       if (mia !== token) return;
       try {
@@ -719,6 +861,8 @@
     $('mCc').setAttribute('aria-pressed', m === 'cc');
     $('mTot').setAttribute('aria-pressed', m === 'total');
     $('mUni').setAttribute('aria-pressed', m === 'unico');
+    $('mObj').setAttribute('aria-pressed', m === 'obj');
+    $('objetivo').hidden = true;
     estado.textContent = 'Pulsa Inicio'; crono.textContent = '0.00'; document.body.className = '';
   }
   $('mNormal').addEventListener('click', function () { setModo('normal'); });
@@ -727,6 +871,7 @@
   $('mCc').addEventListener('click', function () { setModo('cc'); });
   $('mTot').addEventListener('click', function () { setModo('total'); });
   $('mUni').addEventListener('click', function () { setModo('unico'); });
+  $('mObj').addEventListener('click', function () { setModo('obj'); });
   $('tqDur').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     tqDur = parseInt(b.dataset.s, 10);
@@ -735,7 +880,7 @@
 
   function empezar() {
     var mia = ++token;
-    shots = []; parSonado = false; interrTiempo = null; ccTiempo = null; totEtapas = []; $('totRes').hidden = true; $('resultado').hidden = true;
+    shots = []; parSonado = false; interrTiempo = null; ccTiempo = null; totEtapas = []; $('totRes').hidden = true; $('objetivo').hidden = true; objTxt = ''; if (modo === 'total') construirPlan(); $('resultado').hidden = true;
     var resto = 5;
     setFase('cuenta'); document.body.className = '';
     estado.textContent = 'Prepárate…'; crono.textContent = resto; pitido(1000, 0.12);
@@ -749,7 +894,7 @@
       setFase('espera');
       var a = Math.max(0.5, num('dMin')), b = Math.max(a, num('dMax'));
       var espera = (a + Math.random() * (b - a)) * 1000;
-      timers.push(setTimeout(function () {
+      function lanzar() {
         if (mia !== token) return;
         ctx.resume();
         t0 = performance.now(); ultimo = t0;
@@ -761,11 +906,17 @@
         if (modo === 'int') programarInterrupcion(mia);
         if (modo === 'cc') programarCambio(mia);
         if (modo === 'total') {
-          totEtapas = []; sortearPasos(); totKind = 'disparo'; tS = t0; ignoraHasta = t0 + 450;
+          totEtapas = []; totKind = (plan[0] && plan[0].k === 'obj') ? 'obj' : 'disparo'; tS = t0; ignoraHasta = t0 + 450;
           setFase('totCorriendo'); document.body.className = 'go';
           estado.textContent = prefijo() + '¡DISPARA!';
           if (!micOK) bucleTotSinMic();
         }
+      }
+      timers.push(setTimeout(function () {
+        if (mia !== token) return;
+        if (modo === 'obj') { anunciarObjetivo(mia, lanzar); return; }
+        if (modo === 'total' && plan[0] && plan[0].k === 'obj') { anunciarObjetivo(mia, lanzar, plan[0]); return; }
+        lanzar();
       }, espera));
     }, 1000);
     timers.push(iv);
