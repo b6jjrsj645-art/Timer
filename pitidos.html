@@ -24,9 +24,10 @@
   .cab { width:min(94vw,760px); display:flex; align-items:center; gap:.8em; padding-bottom:.55em; border-bottom:2px solid var(--acc); }
   .ins { width:2.9em; height:2.9em; flex:none; filter:drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
   .ins svg { width:100%; height:100%; display:block; }
-  .cab h1 { margin:0; font-size:clamp(1.05rem,4.8vw,1.55rem); letter-spacing:.14em; text-transform:uppercase; }
-  .cab p { margin:.15em 0 0; font-size:.74rem; color:var(--mute); letter-spacing:.09em; text-transform:uppercase; }
-  .bandera { flex:1; min-width:0; height:1.7em; margin-left:.9em; border-radius:.15em; box-shadow:0 1px 4px rgba(0,0,0,.6); }
+  .cab h1 { margin:0; font-size:clamp(1rem,4.4vw,1.5rem); letter-spacing:.1em; text-transform:uppercase; }
+  .cab p { margin:.15em 0 0; font-size:.68rem; color:var(--mute); letter-spacing:.05em; text-transform:uppercase; }
+  .bandera { flex:1 1 auto; min-width:4.5em; height:1.7em; margin-left:.9em; border-radius:.15em; box-shadow:0 1px 4px rgba(0,0,0,.6);
+    background:linear-gradient(#c60b1e 0 25%, #ffc400 25% 75%, #c60b1e 75% 100%); }
   .modos { display:grid; grid-template-columns:1fr 1fr; gap:.5em; width:min(94vw,760px); }
   #mTot { grid-column:1 / -1; }
   .modos button, .opciones button { font:inherit; font-weight:700; cursor:pointer; touch-action:manipulation;
@@ -86,7 +87,7 @@
 </head>
 <body data-modo="normal">
   <div id="flash"></div>
-  <header class="cab"><div class="ins"><svg viewBox="0 0 100 100" aria-label="Culote de vaina"><defs><radialGradient id="latonG" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#f3d36b"/><stop offset="1" stop-color="#a87a1c"/></radialGradient><radialGradient id="cebG" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#e9edf2"/><stop offset="1" stop-color="#8d949c"/></radialGradient></defs><circle cx="50" cy="50" r="48" fill="url(#latonG)" stroke="#6f4f0e" stroke-width="2"/><circle cx="50" cy="50" r="39" fill="none" stroke="#6f4f0e" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="url(#latonG)"/><circle cx="50" cy="50" r="18" fill="url(#cebG)" stroke="#5d636b" stroke-width="2"/><circle cx="50" cy="50" r="6" fill="#6d737b"/></svg></div><div><h1>Timer táctico</h1><p>Tiro en seco · entrenamiento policial</p></div><svg class="bandera" viewBox="0 0 60 40" preserveAspectRatio="none" role="img" aria-label="Bandera de España"><rect width="60" height="40" fill="#c60b1e"/><rect y="10" width="60" height="20" fill="#ffc400"/></svg></header>
+  <header class="cab"><div class="ins"><svg viewBox="0 0 100 100" aria-label="Culote de vaina"><defs><radialGradient id="latonG" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#f3d36b"/><stop offset="1" stop-color="#a87a1c"/></radialGradient><radialGradient id="cebG" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#e9edf2"/><stop offset="1" stop-color="#8d949c"/></radialGradient></defs><circle cx="50" cy="50" r="48" fill="url(#latonG)" stroke="#6f4f0e" stroke-width="2"/><circle cx="50" cy="50" r="39" fill="none" stroke="#6f4f0e" stroke-width="3"/><circle cx="50" cy="50" r="36" fill="url(#latonG)"/><circle cx="50" cy="50" r="18" fill="url(#cebG)" stroke="#5d636b" stroke-width="2"/><circle cx="50" cy="50" r="6" fill="#6d737b"/></svg></div><div><h1>Timer táctico</h1><p>Tiro en seco · entrenamiento policial</p></div><div class="bandera" role="img" aria-label="Bandera de España"></div></header>
   <div class="modos">
     <button id="mNormal" aria-pressed="true">Timer</button>
     <button id="mUni" aria-pressed="false">Único tiro</button>
