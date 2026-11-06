@@ -369,6 +369,13 @@
     decir('¡Herido! ¡Herido!', true, function () {
       if (mia !== token) return;
       tqInicio = performance.now(); tqIgnora = tqInicio + 2500; tqSeguidos = 0; tqRatio = 0; tqHist = []; tqHabla = 0;
+      // Tras "Herido", una extremidad al azar
+      tqZona = ZONAS[Math.floor(Math.random() * ZONAS.length)];
+      esperarVoz(mia, function () {
+        if (fase !== 'tqCuenta') return;
+        estado.textContent = '¡HERIDO! ' + tqZona.toUpperCase();
+        hablar('¡' + tqZona.charAt(0).toUpperCase() + tqZona.slice(1) + '!');
+      });
       var fin = performance.now() + tqDur * 1000;
       var iv = setInterval(function () {
         if (mia !== token) { clearInterval(iv); return; }
@@ -489,7 +496,7 @@
     timers.push(setTimeout(function () {
       if (mia !== token) return;
       if (modo === 'total') {
-        totEtapas.push({ n: 'Torniquete', t: tqDur + ' s ✓' }); renderTot();
+        totEtapas.push({ n: 'Torniquete' + (tqZona ? ' · ' + tqZona : ''), t: tqDur + ' s ✓' }); renderTot();
         etapaTerminada(mia); return;
       }
       setFase('idle'); document.body.className = '';
@@ -522,6 +529,16 @@
     setTimeout(function () { f.classList.remove('on'); }, 110);
   }
   var tqInicio = 0, tqIgnora = 0, tqSeguidos = 0, tqRatio = 0, tqHist = [], tqHabla = 0;
+  var ZONAS = ['brazo derecho', 'brazo izquierdo', 'pierna derecha', 'pierna izquierda'], tqZona = '';
+  // Espera a que termine la voz actual y entonces ejecuta fn
+  function esperarVoz(mia, fn) {
+    var intentos = 0;
+    (function p() {
+      if (mia !== token) return;
+      if (window.speechSynthesis && speechSynthesis.speaking && intentos++ < 40) { timers.push(setTimeout(p, 150)); return; }
+      fn();
+    })();
+  }
   // El usuario marca "torniquete colocado" gritando ¡Ya! / ¡Stop!, tocando el cronómetro o pulsando Parar
   function pararTQ() {
     if (fase !== 'tqCuenta' || !tqInicio) return;
@@ -532,11 +549,11 @@
     destello();
     crono.textContent = fmt(t);
     if (modo === 'total') {
-      totEtapas.push({ n: 'Torniquete', t: fmt(t) + ' s (colocado)' }); renderTot();
+      totEtapas.push({ n: 'Torniquete' + (tqZona ? ' · ' + tqZona : ''), t: fmt(t) + ' s (colocado)' }); renderTot();
       etapaTerminada(token);
     } else {
       setFase('idle'); document.body.className = '';
-      estado.textContent = 'Torniquete colocado: ' + fmt(t) + ' s';
+      estado.textContent = 'Torniquete colocado' + (tqZona ? ' (' + tqZona + ')' : '') + ': ' + fmt(t) + ' s';
     }
   }
   // ---------- Entrenamiento total (ejercicios aleatorios encadenados) ----------
